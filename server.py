@@ -93,6 +93,44 @@ def jira_issue_link():
         return jsonify({'error': str(e)}), 500
 
 
+# Attachment upload endpoint
+@app.route('/api/jira-attachment/<issue_key>', methods=['POST'])
+def jira_attachment(issue_key):
+    """Issue'ya dosya ekle"""
+
+    jira_url = request.headers.get('X-Jira-Url', '').rstrip('/')
+    auth_header = request.headers.get('Authorization', '')
+
+    if not jira_url or not auth_header:
+        return jsonify({'error': 'Jira URL ve Authorization header gerekli'}), 400
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'Dosya bulunamadı'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Dosya seçilmedi'}), 400
+
+    jira_endpoint = f"{jira_url}/rest/api/2/issue/{issue_key}/attachments"
+
+    headers = {
+        'Authorization': auth_header,
+        'X-Atlassian-Token': 'no-check'
+    }
+
+    try:
+        # Multipart form-data olarak gönder
+        files = {'file': (file.filename, file.stream, file.content_type)}
+        resp = requests.post(jira_endpoint, headers=headers, files=files, verify=False)
+
+        if resp.status_code == 200:
+            return jsonify(resp.json()), 200
+        else:
+            return jsonify({'error': resp.text}), resp.status_code
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("Jira Task Creator Server")

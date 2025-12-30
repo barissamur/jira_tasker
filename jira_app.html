@@ -216,6 +216,7 @@
                                 <th>Title Sonu</th>
                                 <th style="width:100px">Süre (saat)</th>
                                 <th>Açıklama Sonu</th>
+                                <th style="width:200px">Görsel</th>
                                 <th style="width:50px">Sil</th>
                             </tr>
                         </thead>
@@ -717,6 +718,11 @@
                         <textarea class="form-control task-desc" rows="2"
                             placeholder="nın HTML kodlarının dönüşümü yapılacaktır">${descSuffix}</textarea>
                     </td>
+                    <td>
+                        <input type="file" class="form-control form-control-sm task-image"
+                            accept="image/*" multiple>
+                        <small class="text-muted task-image-info"></small>
+                    </td>
                     <td class="text-center align-middle">
                         <button class="btn btn-outline-danger btn-delete" onclick="deleteRow(this)">
                             <i class="bi bi-trash"></i>
@@ -726,6 +732,17 @@
             `;
             $('#taskTableBody').append(row);
             updateRowNumbers();
+
+            // Dosya seçildiğinde bilgi göster
+            $(`#taskTableBody tr:last .task-image`).on('change', function() {
+                const files = this.files;
+                const info = $(this).siblings('.task-image-info');
+                if (files.length > 0) {
+                    info.text(`${files.length} dosya seçildi`);
+                } else {
+                    info.text('');
+                }
+            });
         }
 
         window.deleteRow = function(btn) {
@@ -756,12 +773,15 @@
                 const titleSuffix = $(this).find('.task-title').val().trim();
                 const hours = $(this).find('.task-hours').val().trim();
                 const descSuffix = $(this).find('.task-desc').val().trim();
+                const fileInput = $(this).find('.task-image')[0];
+                const files = fileInput ? fileInput.files : [];
 
                 if (titleSuffix) {
                     tasks.push({
                         summary: titlePrefix ? `${titlePrefix} ${titleSuffix}` : titleSuffix,
                         description: descPrefix ? `${descPrefix} ${descSuffix}` : descSuffix,
-                        hours: hours || '3'
+                        hours: hours || '3',
+                        files: Array.from(files)
                     });
                 }
             });
@@ -794,9 +814,11 @@
             `;
 
             tasks.forEach((task, index) => {
+                const fileCount = task.files ? task.files.length : 0;
+                const fileInfo = fileCount > 0 ? `<span class="badge bg-info">${fileCount} görsel</span>` : '';
                 html += `
                     <div class="task-preview">
-                        <h6><strong>Task ${index + 1}</strong></h6>
+                        <h6><strong>Task ${index + 1}</strong> ${fileInfo}</h6>
                         <p><strong>Title:</strong> ${task.summary}</p>
                         <p><strong>Süre:</strong> ${task.hours} saat</p>
                         <p><strong>Açıklama:</strong> ${task.description || '-'}</p>
@@ -882,6 +904,30 @@
             }
         }
 
+        // Dosya yükleme fonksiyonu
+        async function uploadAttachment(issueKey, file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                await $.ajax({
+                    url: `/api/jira-attachment/${issueKey}`,
+                    type: 'POST',
+                    headers: {
+                        'X-Jira-Url': getJiraUrl(),
+                        'Authorization': getAuthHeader()
+                    },
+                    data: formData,
+                    processData: false,
+                    contentType: false
+                });
+                return true;
+            } catch (err) {
+                console.error(`Dosya yükleme hatası (${issueKey}):`, err);
+                return false;
+            }
+        }
+
         async function createAllTasks() {
             const tasks = collectTaskData();
 
@@ -914,7 +960,18 @@
                     try {
                         const result = await createJiraIssue(tasks[i]);
                         createdKeys.push(result.key);
-                        results.push({ success: true, key: result.key, summary: tasks[i].summary });
+
+                        // Görselleri yükle
+                        let attachmentCount = 0;
+                        if (tasks[i].files && tasks[i].files.length > 0) {
+                            for (const file of tasks[i].files) {
+                                const uploaded = await uploadAttachment(result.key, file);
+                                if (uploaded) attachmentCount++;
+                            }
+                        }
+
+                        const attachmentInfo = attachmentCount > 0 ? ` (${attachmentCount} görsel eklendi)` : '';
+                        results.push({ success: true, key: result.key, summary: tasks[i].summary, attachmentInfo });
                     } catch (err) {
                         results.push({ success: false, error: err.message, summary: tasks[i].summary });
                     }
@@ -933,7 +990,7 @@
                 results.forEach(r => {
                     if (r.success) {
                         html += `<li class="text-success"><i class="bi bi-check-circle"></i>
-                            <a href="${getJiraUrl()}/browse/${r.key}" target="_blank">${r.key}</a> - ${r.summary}</li>`;
+                            <a href="${getJiraUrl()}/browse/${r.key}" target="_blank">${r.key}</a> - ${r.summary}${r.attachmentInfo || ''}</li>`;
                     } else {
                         html += `<li class="text-danger"><i class="bi bi-x-circle"></i>
                             ${r.summary} - Hata: ${r.error}</li>`;
