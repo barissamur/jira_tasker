@@ -35,10 +35,6 @@
         .saved-badge {
             font-size: 0.8rem;
         }
-        #resultArea {
-            max-height: 300px;
-            overflow-y: auto;
-        }
         .task-preview {
             background: #f8f9fa;
             border-radius: 8px;
@@ -141,6 +137,66 @@
         .btn-view-images {
             padding: 2px 6px;
             font-size: 0.75rem;
+        }
+        /* Toast Container */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .custom-toast {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin-top: 10px;
+            animation: slideIn 0.3s ease;
+        }
+        .custom-toast.toast-success { border-left: 4px solid #198754; }
+        .custom-toast.toast-danger { border-left: 4px solid #dc3545; }
+        .custom-toast.toast-warning { border-left: 4px solid #ffc107; }
+        .custom-toast.toast-info { border-left: 4px solid #0dcaf0; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .custom-toast.hiding {
+            animation: slideOut 0.3s ease forwards;
+        }
+        /* History */
+        .history-item {
+            border-left: 3px solid #0d6efd;
+            background: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 0 8px 8px 0;
+        }
+        .history-item:hover {
+            background: #e9ecef;
+        }
+        .history-date {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+        /* History Modal - Sabit Boyut */
+        #historyModal .modal-dialog {
+            max-width: 70vw;
+            width: 70vw;
+        }
+        #historyModal .modal-content {
+            height: 70vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #historyModal .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
         }
     </style>
 </head>
@@ -309,17 +365,21 @@
 
         <!-- İşlem Butonları -->
         <div class="d-flex gap-2 mb-4">
-            <button class="btn btn-warning btn-lg" id="previewBtn">
+            <button class="btn btn-warning" id="previewBtn">
                 <i class="bi bi-eye"></i> Önizle
             </button>
-            <button class="btn btn-primary btn-lg" id="createBtn">
+            <button class="btn btn-primary" id="createBtn">
                 <i class="bi bi-cloud-upload"></i> Tümünü Oluştur
             </button>
+            <button class="btn btn-outline-secondary" id="historyBtn">
+                <i class="bi bi-clock-history"></i> Geçmiş
+                <span class="badge bg-secondary" id="historyCount">0</span>
+            </button>
         </div>
-
-        <!-- Sonuç Alanı -->
-        <div id="resultArea" class="alert" style="display:none;"></div>
     </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <!-- Önizleme Modal -->
     <div class="modal fade" id="previewModal" tabindex="-1">
@@ -367,6 +427,27 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal fade" id="historyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title"><i class="bi bi-clock-history"></i> Task Geçmişi</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="historyContent">
+                    <!-- Geçmiş içeriği -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger" id="clearHistory">
+                        <i class="bi bi-trash"></i> Geçmişi Temizle
+                    </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
                 </div>
             </div>
@@ -1311,24 +1392,34 @@
                     }
                 }
 
-                let html = '<h5>Sonuçlar:</h5><ul>';
+                // Başarılı taskları history'ye kaydet
+                const successfulTasks = results.filter(r => r.success).map(r => ({
+                    key: r.key,
+                    summary: r.summary
+                }));
+
+                if (successfulTasks.length > 0) {
+                    saveToHistory(successfulTasks, getJiraUrl());
+                }
+
+                // Sonuç mesajı oluştur
+                let html = `<strong>${successfulTasks.length}/${results.length} task oluşturuldu</strong><br>`;
                 results.forEach(r => {
                     if (r.success) {
-                        html += `<li class="text-success"><i class="bi bi-check-circle"></i>
-                            <a href="${getJiraUrl()}/browse/${r.key}" target="_blank">${r.key}</a> - ${r.summary}${r.attachmentInfo || ''}</li>`;
-                    } else {
-                        html += `<li class="text-danger"><i class="bi bi-x-circle"></i>
-                            ${r.summary} - Hata: ${r.error}</li>`;
+                        html += `<a href="${getJiraUrl()}/browse/${r.key}" target="_blank" class="text-decoration-none">${r.key}</a>${r.attachmentInfo || ''} `;
                     }
                 });
-                html += '</ul>';
 
                 if (createdKeys.length > 1) {
-                    html += `<p class="mt-2"><i class="bi bi-link-45deg"></i> ${createdKeys.length} task birbirine bağlandı (relates to)</p>`;
+                    html += `<br><small><i class="bi bi-link-45deg"></i> ${createdKeys.length} task bağlandı</small>`;
                 }
 
                 const hasError = results.some(r => !r.success);
-                showResult(html, hasError ? 'warning' : 'success', false);
+                if (hasError) {
+                    html += `<br><small class="text-danger">Bazı tasklar oluşturulamadı</small>`;
+                }
+
+                showResult(html, hasError ? 'warning' : 'success', 10000);
 
             } catch (err) {
                 showResult(`Hata oluştu: ${err.message}`, 'danger');
@@ -1343,19 +1434,142 @@
             createAllTasks();
         });
 
-        // ==================== Yardımcı Fonksiyonlar ====================
+        // ==================== Toast Bildirimleri ====================
 
-        function showResult(message, type, isText = true) {
-            const area = $('#resultArea');
-            area.removeClass('alert-success alert-danger alert-warning alert-info')
-                .addClass(`alert-${type}`)
-                .html(message)
-                .show();
+        function showResult(message, type, duration = 5000) {
+            const toastId = 'toast_' + Date.now();
+            const icons = {
+                success: 'bi-check-circle-fill text-success',
+                danger: 'bi-x-circle-fill text-danger',
+                warning: 'bi-exclamation-triangle-fill text-warning',
+                info: 'bi-info-circle-fill text-info'
+            };
 
-            $('html, body').animate({
-                scrollTop: area.offset().top - 100
-            }, 500);
+            const toast = $(`
+                <div class="custom-toast toast-${type}" id="${toastId}">
+                    <div class="d-flex align-items-start p-3">
+                        <i class="bi ${icons[type]} me-2 mt-1"></i>
+                        <div class="flex-grow-1">${message}</div>
+                        <button type="button" class="btn-close ms-2" onclick="closeToast('${toastId}')"></button>
+                    </div>
+                </div>
+            `);
+
+            $('#toastContainer').append(toast);
+
+            // Otomatik kapanma
+            if (duration > 0) {
+                setTimeout(() => closeToast(toastId), duration);
+            }
         }
+
+        window.closeToast = function(toastId) {
+            const toast = $(`#${toastId}`);
+            toast.addClass('hiding');
+            setTimeout(() => toast.remove(), 300);
+        };
+
+        // ==================== Task Geçmişi (History) ====================
+
+        const HISTORY_KEY = 'jira_task_history';
+
+        function getHistory() {
+            const data = localStorage.getItem(HISTORY_KEY);
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveToHistory(tasks, jiraUrl) {
+            const history = getHistory();
+            const entry = {
+                id: Date.now(),
+                date: new Date().toLocaleString('tr-TR'),
+                jiraUrl: jiraUrl,
+                tasks: tasks
+            };
+            history.unshift(entry); // En yenisi başa
+
+            // Toplam task sayısını hesapla
+            let totalTasks = history.reduce((sum, e) => sum + e.tasks.length, 0);
+
+            // 500 task'tan fazlaysa, en eskiden entry'leri sil (tek tek)
+            while (totalTasks > 500 && history.length > 1) {
+                const removed = history.pop();
+                totalTasks -= removed.tasks.length;
+            }
+
+            try {
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+            } catch (e) {
+                // localStorage dolu ise eski kayıtları sil
+                if (e.name === 'QuotaExceededError') {
+                    // Toplam 100 task'a düşür
+                    while (totalTasks > 100 && history.length > 1) {
+                        const removed = history.pop();
+                        totalTasks -= removed.tasks.length;
+                    }
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+                    showResult('Depolama alanı doldu, eski kayıtlar temizlendi.', 'warning');
+                }
+            }
+            updateHistoryCount();
+        }
+
+        function updateHistoryCount() {
+            const count = getHistory().reduce((sum, entry) => sum + entry.tasks.length, 0);
+            $('#historyCount').text(count);
+        }
+
+        function renderHistory() {
+            const history = getHistory();
+            const $content = $('#historyContent');
+
+            if (history.length === 0) {
+                $content.html('<p class="text-muted text-center">Henüz oluşturulmuş task yok.</p>');
+                return;
+            }
+
+            let html = '';
+            history.forEach(entry => {
+                html += `<div class="history-item">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="history-date"><i class="bi bi-calendar"></i> ${entry.date}</span>
+                        <span class="badge bg-primary">${entry.tasks.length} task</span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">`;
+
+                entry.tasks.forEach(task => {
+                    html += `<a href="${entry.jiraUrl}/browse/${task.key}" target="_blank"
+                        class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-box-arrow-up-right"></i> ${task.key}
+                    </a>`;
+                });
+
+                html += `</div>
+                    <small class="text-muted d-block mt-2">${entry.tasks.map(t => t.summary).join(' | ')}</small>
+                </div>`;
+            });
+
+            $content.html(html);
+        }
+
+        // History buton
+        $('#historyBtn').click(function() {
+            renderHistory();
+            new bootstrap.Modal('#historyModal').show();
+        });
+
+        // Geçmişi temizle
+        $('#clearHistory').click(function() {
+            if (confirm('Tüm task geçmişi silinecek. Emin misiniz?')) {
+                localStorage.removeItem(HISTORY_KEY);
+                updateHistoryCount();
+                renderHistory();
+                showResult('Task geçmişi temizlendi.', 'info');
+            }
+        });
+
+        // Sayfa yüklendiğinde history sayısını güncelle
+        updateHistoryCount();
 
         // Sayfa yüklendiğinde bağlantı varsa verileri otomatik yükle
         if ($('#jiraUrl').val() && $('#jiraToken').val()) {
