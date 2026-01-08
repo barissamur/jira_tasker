@@ -253,6 +253,96 @@
             overflow-y: auto;
             min-height: 0;
         }
+        /* ==================== Sayfa Navigasyonu ==================== */
+        .page-nav-container {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .page-nav-item {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            font-size: 0.85rem;
+        }
+        .page-nav-item:hover {
+            background: #e9ecef;
+        }
+        .page-nav-item.active {
+            background: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+        .page-nav-item.completed {
+            background: #d1e7dd;
+            border-color: #198754;
+        }
+        .page-nav-item.completed .page-status-icon {
+            color: #198754;
+        }
+        .page-nav-item.active.completed {
+            background: #198754;
+            color: white;
+        }
+        .page-status-icon {
+            font-size: 0.9rem;
+        }
+        .module-header {
+            padding: 10px 12px;
+            font-weight: 600;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .module-header:hover {
+            background: #e9ecef;
+        }
+        .module-header .badge {
+            font-size: 0.7rem;
+        }
+        .module-pages {
+            margin-left: 15px;
+            margin-bottom: 10px;
+        }
+        .current-page-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .current-page-info h5 {
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .current-page-info .page-path {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        .page-nav-card {
+            position: sticky;
+            top: 20px;
+        }
+        /* JSON Modu göstergesi */
+        .json-mode-indicator {
+            display: none;
+        }
+        .json-mode-indicator.active {
+            display: block;
+        }
+        /* Manuel mod göstergesi */
+        .manual-mode-indicator {
+            display: block;
+        }
+        .manual-mode-indicator.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -395,41 +485,122 @@
             </div>
         </div>
 
-        <!-- Task Listesi -->
+        <!-- Refinement JSON Import -->
         <div class="card">
-            <div class="card-header bg-success text-white">
-                <i class="bi bi-list-task"></i> Task Listesi
+            <div class="card-header bg-warning text-dark">
+                <i class="bi bi-file-earmark-code"></i> Refinement JSON Import
             </div>
             <div class="card-body">
-                <button class="btn btn-success mb-3" id="addTask">
-                    <i class="bi bi-plus-circle"></i> Task Ekle
-                </button>
-                <div class="table-responsive">
-                    <table class="table table-bordered" id="taskTable">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width:40px">#</th>
-                                <th>Title Sonu</th>
-                                <th style="width:100px">Süre (saat)</th>
-                                <th>Açıklama Sonu</th>
-                                <th style="width:200px">Görsel</th>
-                                <th style="width:50px">Sil</th>
-                            </tr>
-                        </thead>
-                        <tbody id="taskTableBody">
-                            <!-- Dinamik satırlar buraya eklenecek -->
-                        </tbody>
-                    </table>
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <input type="file" class="form-control" id="jsonFileInput" accept=".json">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-warning w-100" id="loadJsonBtn">
+                            <i class="bi bi-upload"></i> JSON Yükle
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-secondary w-100" id="clearJsonBtn">
+                            <i class="bi bi-x-circle"></i> Temizle
+                        </button>
+                    </div>
+                </div>
+                <div id="jsonPreview" class="mt-3" style="display:none;">
+                    <div class="alert alert-info mb-0">
+                        <strong>Yüklenen:</strong> <span id="jsonModulInfo"></span>
+                        <span class="mx-2">|</span>
+                        <strong>Sayfa:</strong> <span id="jsonPageCount"></span>
+                        <span class="mx-2">|</span>
+                        <strong>Toplam Task:</strong> <span id="jsonTaskCount"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sol Panel (Sayfa Navigasyonu) + Sağ Panel (Task Listesi) -->
+        <div class="row">
+            <!-- Sol Panel: Sayfa Navigasyonu (JSON modunda görünür) -->
+            <div class="col-md-3 json-mode-indicator" id="pageNavPanel">
+                <div class="card page-nav-card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-list-nested"></i> Sayfalar
+                        <span class="badge bg-light text-primary float-end" id="pageProgressBadge">0/0</span>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="page-nav-container" id="pageNavContainer">
+                            <!-- Sayfa navigasyonu buraya dinamik olarak eklenecek -->
+                            <p class="text-muted text-center small">JSON yükleyin</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Panel: Task Listesi -->
+            <div class="col-md-12" id="taskListPanel">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-list-task"></i> Task Listesi
+                        <span class="json-mode-indicator float-end" id="currentPageBadge"></span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Aktif Sayfa Bilgisi (JSON modunda görünür) -->
+                        <div class="current-page-info json-mode-indicator" id="currentPageInfo">
+                            <h5 id="currentPageTitle">Sayfa seçin</h5>
+                            <div class="page-path" id="currentPagePath"></div>
+                        </div>
+
+                        <!-- Manuel mod: Task Ekle butonu -->
+                        <div class="manual-mode-indicator" id="manualModeControls">
+                            <button class="btn btn-success mb-3" id="addTask">
+                                <i class="bi bi-plus-circle"></i> Task Ekle
+                            </button>
+                        </div>
+
+                        <!-- Task Tablosu (Sadeleştirilmiş) -->
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="taskTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:40px">#</th>
+                                        <th>Title Sonu</th>
+                                        <th style="width:80px">Süre (saat)</th>
+                                        <th>Açıklama Sonu</th>
+                                        <th style="width:180px">Görsel</th>
+                                        <th style="width:50px">Sil</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="taskTableBody">
+                                    <!-- Dinamik satırlar buraya eklenecek -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- JSON Modu: Sayfa İşlem Butonları -->
+                        <div class="json-mode-indicator mt-3" id="pageActionButtons">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" id="createPageTasksBtn">
+                                    <i class="bi bi-cloud-upload"></i> Bu Sayfayı Oluştur
+                                </button>
+                                <button class="btn btn-outline-primary" id="nextPageBtn">
+                                    Sonraki Sayfa <i class="bi bi-arrow-right"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" id="prevPageBtn">
+                                    <i class="bi bi-arrow-left"></i> Önceki Sayfa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- İşlem Butonları -->
-        <div class="d-flex gap-2 mb-4">
+        <div class="d-flex gap-2 mb-4 mt-3">
             <button class="btn btn-warning" id="previewBtn">
                 <i class="bi bi-eye"></i> Önizle
             </button>
-            <button class="btn btn-primary" id="createBtn">
+            <button class="btn btn-primary manual-mode-indicator" id="createBtn">
                 <i class="bi bi-cloud-upload"></i> Tümünü Oluştur
             </button>
             <button class="btn btn-outline-secondary" id="historyBtn">
@@ -984,55 +1155,74 @@
 
         // ==================== Dinamik Task Tablosu ====================
 
-        let taskCounter = 0;
+        var taskCounter = 0;
         // Yapıştırılan dosyaları sakla (file input'a programatik eklenemez)
         window.pastedFiles = {};
 
-        function addTaskRow(titleSuffix = '', hours = '3', descSuffix = '') {
+        // ==================== State Değişkenleri ====================
+        var loadedJsonData = null;      // Yüklenen JSON verisi
+        var currentPageIndex = -1;      // Aktif sayfa indeksi
+        var completedPages = {};        // Tamamlanan sayfalar {pageIndex: true}
+        var isJsonMode = false;         // JSON modu aktif mi?
+
+        // Escape HTML karakterleri
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Sadeleştirilmiş addTaskRow (prefix sütunları kaldırıldı)
+        function addTaskRow(titleSuffix, hours, descSuffix) {
             taskCounter++;
-            const rowId = taskCounter;
+            var rowId = taskCounter;
             window.pastedFiles[rowId] = [];
 
-            const row = `
-                <tr class="task-row" data-id="${rowId}">
-                    <td class="text-center align-middle">${rowId}</td>
-                    <td>
-                        <input type="text" class="form-control task-title"
-                            placeholder="html kodlarının dönüştürülmesi" value="${titleSuffix}">
-                    </td>
-                    <td>
-                        <input type="number" class="form-control task-hours"
-                            min="1" value="${hours}">
-                    </td>
-                    <td>
-                        <textarea class="form-control task-desc" rows="2"
-                            placeholder="nın HTML kodlarının dönüşümü yapılacaktır">${descSuffix}</textarea>
-                    </td>
-                    <td class="paste-zone" tabindex="0" style="cursor:pointer;">
-                        <div class="d-flex align-items-center gap-1 mb-1">
-                            <input type="file" class="form-control form-control-sm task-image"
-                                accept="image/*" multiple style="flex:1;">
-                            <button type="button" class="btn btn-outline-info btn-view-images" title="Görselleri Görüntüle">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                        <div class="paste-hint text-muted small">
-                            <i class="bi bi-clipboard"></i> Ctrl+V ile yapıştır
-                        </div>
-                        <div class="pasted-preview mt-1"></div>
-                        <small class="text-muted task-image-info"></small>
-                    </td>
-                    <td class="text-center align-middle">
-                        <button class="btn btn-outline-danger btn-delete" onclick="deleteRow(this)">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
+            // Varsayılan değerler
+            titleSuffix = titleSuffix || '';
+            hours = hours || '3';
+            descSuffix = descSuffix || '';
+
+            var row = '<tr class="task-row" data-id="' + rowId + '">' +
+                '<td class="text-center align-middle">' + rowId + '</td>' +
+                '<td>' +
+                    '<input type="text" class="form-control form-control-sm task-title-suffix" ' +
+                        'placeholder="html kodlarının dönüştürülmesi" value="' + escapeHtml(titleSuffix) + '">' +
+                '</td>' +
+                '<td>' +
+                    '<input type="number" class="form-control form-control-sm task-hours" ' +
+                        'min="1" value="' + hours + '">' +
+                '</td>' +
+                '<td>' +
+                    '<input type="text" class="form-control form-control-sm task-desc-suffix" ' +
+                        'placeholder="HTML kodlarının dönüşümü yapılacaktır." value="' + escapeHtml(descSuffix) + '">' +
+                '</td>' +
+                '<td class="paste-zone" tabindex="0" style="cursor:pointer;">' +
+                    '<div class="d-flex align-items-center gap-1 mb-1">' +
+                        '<input type="file" class="form-control form-control-sm task-image" ' +
+                            'accept="image/*" multiple style="flex:1; font-size:0.7rem;">' +
+                        '<button type="button" class="btn btn-outline-info btn-view-images btn-sm" title="Görselleri Görüntüle">' +
+                            '<i class="bi bi-eye"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="paste-hint text-muted small" style="font-size:0.7rem;">' +
+                        '<i class="bi bi-clipboard"></i> Ctrl+V' +
+                    '</div>' +
+                    '<div class="pasted-preview mt-1"></div>' +
+                    '<small class="text-muted task-image-info"></small>' +
+                '</td>' +
+                '<td class="text-center align-middle">' +
+                    '<button class="btn btn-outline-danger btn-delete btn-sm" onclick="deleteRow(this)">' +
+                        '<i class="bi bi-trash"></i>' +
+                    '</button>' +
+                '</td>' +
+            '</tr>';
+
             $('#taskTableBody').append(row);
             updateRowNumbers();
 
-            const $row = $(`#taskTableBody tr:last`);
+            var $row = $('#taskTableBody tr:last');
 
             // Dosya seçildiğinde bilgi göster
             $row.find('.task-image').on('change', function() {
@@ -1215,30 +1405,467 @@
 
         addTaskRow();
 
+        // ==================== Refinement JSON Import ====================
+
+        // JSON dosyasını yükle butonu
+        $('#loadJsonBtn').click(function() {
+            var fileInput = $('#jsonFileInput')[0];
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showResult('Lütfen bir JSON dosyası seçin.', 'warning');
+                return;
+            }
+            loadRefinementJson(fileInput.files[0]);
+        });
+
+        // Temizle butonu - Manuel moda dön
+        $('#clearJsonBtn').click(function() {
+            $('#jsonFileInput').val('');
+            $('#jsonPreview').hide();
+            $('#taskTableBody').empty();
+            taskCounter = 0;
+            window.pastedFiles = {};
+
+            // State'i sıfırla
+            loadedJsonData = null;
+            currentPageIndex = -1;
+            completedPages = {};
+
+            // Manuel moda geç
+            exitJsonMode();
+
+            addTaskRow(); // Boş bir satır ekle
+            showResult('Task listesi temizlendi. Manuel moda geçildi.', 'info');
+        });
+
+        // JSON dosyasını oku ve parse et
+        function loadRefinementJson(file) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var data = JSON.parse(e.target.result);
+                    validateAndProcessJson(data);
+                } catch (err) {
+                    showResult('Geçersiz JSON formatı: ' + err.message, 'danger');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // JSON'u doğrula ve işle
+        function validateAndProcessJson(data) {
+            // pages dizisi kontrolü
+            if (!data.pages || !Array.isArray(data.pages)) {
+                showResult('JSON formatı hatalı: pages dizisi bulunamadı', 'danger');
+                return;
+            }
+
+            // JSON verisini sakla
+            loadedJsonData = data;
+            currentPageIndex = -1;
+            completedPages = {};
+
+            // Önizleme bilgilerini göster
+            showJsonPreview(data);
+
+            // JSON moduna geç
+            enterJsonMode();
+
+            // Sayfa navigasyonunu oluştur
+            buildPageNavigation(data);
+
+            // İlk sayfayı otomatik seç
+            if (data.pages.length > 0) {
+                selectPage(0);
+            }
+
+            showResult(data.pages.length + ' sayfa yüklendi. Sol panelden sayfa seçerek işlem yapabilirsiniz.', 'success');
+        }
+
+        // JSON moduna gir
+        function enterJsonMode() {
+            isJsonMode = true;
+            // JSON modu göstergelerini aktif et
+            $('.json-mode-indicator').addClass('active');
+            // Manuel mod göstergelerini gizle
+            $('.manual-mode-indicator').addClass('hidden');
+            // Task listesi panelini daralt (col-md-9)
+            $('#taskListPanel').removeClass('col-md-12').addClass('col-md-9');
+        }
+
+        // Manuel moda dön
+        function exitJsonMode() {
+            isJsonMode = false;
+            // JSON modu göstergelerini kapat
+            $('.json-mode-indicator').removeClass('active');
+            // Manuel mod göstergelerini göster
+            $('.manual-mode-indicator').removeClass('hidden');
+            // Task listesi panelini genişlet (col-md-12)
+            $('#taskListPanel').removeClass('col-md-9').addClass('col-md-12');
+            // Sayfa navigasyonunu temizle
+            $('#pageNavContainer').html('<p class="text-muted text-center small">JSON yükleyin</p>');
+        }
+
+        // JSON önizleme bilgilerini göster
+        function showJsonPreview(data) {
+            var pageCount = data.pages.length;
+            var taskCount = 0;
+
+            // Modül isimlerini topla
+            var modules = {};
+            for (var i = 0; i < data.pages.length; i++) {
+                var klasor = data.pages[i].klasor || 'diger';
+                modules[klasor] = (modules[klasor] || 0) + 1;
+                if (data.pages[i].tasks && data.pages[i].tasks.length) {
+                    taskCount += data.pages[i].tasks.length;
+                }
+            }
+
+            // Modül bilgisini formatla
+            var modulInfo = Object.keys(modules).map(function(k) {
+                return k.toUpperCase() + ' (' + modules[k] + ')';
+            }).join(', ');
+
+            $('#jsonModulInfo').text(modulInfo || 'Bilinmiyor');
+            $('#jsonPageCount').text(pageCount);
+            $('#jsonTaskCount').text(taskCount);
+            $('#jsonPreview').show();
+        }
+
+        // Sayfa navigasyonunu oluştur
+        function buildPageNavigation(data) {
+            var $container = $('#pageNavContainer');
+            $container.empty();
+
+            // Sayfaları modüle göre grupla
+            var modules = {};
+            for (var i = 0; i < data.pages.length; i++) {
+                var page = data.pages[i];
+                var mod = (page.klasor || 'diger').toUpperCase();
+                if (!modules[mod]) {
+                    modules[mod] = [];
+                }
+                modules[mod].push({ page: page, index: i });
+            }
+
+            // Her modül için accordion oluştur
+            var moduleKeys = Object.keys(modules);
+            for (var m = 0; m < moduleKeys.length; m++) {
+                var modName = moduleKeys[m];
+                var modPages = modules[modName];
+
+                // Modül başlığı
+                var $moduleHeader = $('<div class="module-header" data-module="' + modName + '">' +
+                    '<span><i class="bi bi-folder2-open me-2"></i>' + modName + '</span>' +
+                    '<span class="badge bg-secondary">' + modPages.length + ' sayfa</span>' +
+                '</div>');
+
+                // Modül sayfaları container
+                var $modulePages = $('<div class="module-pages" data-module-pages="' + modName + '"></div>');
+
+                // Sayfaları ekle
+                for (var p = 0; p < modPages.length; p++) {
+                    var pageData = modPages[p];
+                    var taskCount = pageData.page.tasks ? pageData.page.tasks.length : 0;
+                    var $pageItem = $('<div class="page-nav-item" data-page-index="' + pageData.index + '">' +
+                        '<span class="page-status-icon me-2"><i class="bi bi-circle"></i></span>' +
+                        '<span class="page-name">' + escapeHtml(pageData.page.sayfaAdi || pageData.page.dosyaAdi) + '</span>' +
+                        '<span class="badge bg-light text-dark ms-auto">' + taskCount + '</span>' +
+                    '</div>');
+
+                    // Sayfa tıklama olayı
+                    $pageItem.on('click', function() {
+                        var idx = parseInt($(this).attr('data-page-index'));
+                        selectPage(idx);
+                    });
+
+                    $modulePages.append($pageItem);
+                }
+
+                // Modül toggle olayı
+                $moduleHeader.on('click', function() {
+                    var mod = $(this).attr('data-module');
+                    $('[data-module-pages="' + mod + '"]').slideToggle(200);
+                });
+
+                $container.append($moduleHeader);
+                $container.append($modulePages);
+            }
+
+            // İlerleme badge'ini güncelle
+            updatePageProgress();
+        }
+
+        // Sayfa seç ve yükle
+        function selectPage(pageIndex) {
+            if (!loadedJsonData || pageIndex < 0 || pageIndex >= loadedJsonData.pages.length) {
+                return;
+            }
+
+            var page = loadedJsonData.pages[pageIndex];
+            currentPageIndex = pageIndex;
+
+            // Navigasyonda aktif sayfayı işaretle
+            $('.page-nav-item').removeClass('active');
+            $('.page-nav-item[data-page-index="' + pageIndex + '"]').addClass('active');
+
+            // Title/Açıklama Başlangıcı'nı yukarıdaki input'lara yaz
+            $('#titlePrefix').val(page.titlePrefix || '');
+            $('#descriptionPrefix').val(page.descPrefix || '');
+
+            // Aktif sayfa bilgisini göster
+            $('#currentPageTitle').text(page.sayfaAdi || page.dosyaAdi);
+            $('#currentPagePath').text((page.klasor || '') + '/' + (page.dosyaAdi || ''));
+            $('#currentPageBadge').html('<span class="badge bg-light text-success">' + (pageIndex + 1) + '/' + loadedJsonData.pages.length + '</span>');
+
+            // Sadece bu sayfanın task'larını tabloya yükle
+            loadPageTasks(page);
+
+            // Navigasyon butonlarını güncelle
+            updateNavButtons();
+        }
+
+        // Sayfanın task'larını tabloya yükle
+        function loadPageTasks(page) {
+            // Mevcut satırları temizle
+            $('#taskTableBody').empty();
+            taskCounter = 0;
+            window.pastedFiles = {};
+
+            // Task'ları ekle
+            if (page.tasks && page.tasks.length > 0) {
+                for (var j = 0; j < page.tasks.length; j++) {
+                    var task = page.tasks[j];
+                    addTaskRow(
+                        task.titleSuffix || '',    // Title Sonu
+                        task.sure || '3',          // Süre
+                        task.descSuffix || ''      // Açıklama Sonu
+                    );
+                }
+            }
+        }
+
+        // Navigasyon butonlarını güncelle
+        function updateNavButtons() {
+            var prevBtn = $('#prevPageBtn');
+            var nextBtn = $('#nextPageBtn');
+
+            // Önceki butonu
+            if (currentPageIndex <= 0) {
+                prevBtn.prop('disabled', true);
+            } else {
+                prevBtn.prop('disabled', false);
+            }
+
+            // Sonraki butonu
+            if (!loadedJsonData || currentPageIndex >= loadedJsonData.pages.length - 1) {
+                nextBtn.prop('disabled', true);
+            } else {
+                nextBtn.prop('disabled', false);
+            }
+        }
+
+        // İlerleme badge'ini güncelle
+        function updatePageProgress() {
+            if (!loadedJsonData) return;
+
+            var completedCount = Object.keys(completedPages).length;
+            var totalCount = loadedJsonData.pages.length;
+            $('#pageProgressBadge').text(completedCount + '/' + totalCount);
+
+            // Navigasyondaki ikonları güncelle
+            for (var i = 0; i < totalCount; i++) {
+                var $item = $('.page-nav-item[data-page-index="' + i + '"]');
+                var $icon = $item.find('.page-status-icon i');
+
+                if (completedPages[i]) {
+                    $item.addClass('completed');
+                    $icon.removeClass('bi-circle').addClass('bi-check-circle-fill');
+                } else {
+                    $item.removeClass('completed');
+                    $icon.removeClass('bi-check-circle-fill').addClass('bi-circle');
+                }
+            }
+        }
+
+        // Sayfayı tamamlandı olarak işaretle
+        function markPageAsCompleted(pageIndex) {
+            completedPages[pageIndex] = true;
+            updatePageProgress();
+        }
+
+        // Sonraki sayfa butonu
+        $('#nextPageBtn').click(function() {
+            if (loadedJsonData && currentPageIndex < loadedJsonData.pages.length - 1) {
+                selectPage(currentPageIndex + 1);
+            }
+        });
+
+        // Önceki sayfa butonu
+        $('#prevPageBtn').click(function() {
+            if (currentPageIndex > 0) {
+                selectPage(currentPageIndex - 1);
+            }
+        });
+
+        // Bu Sayfayı Oluştur butonu
+        $('#createPageTasksBtn').click(function() {
+            createCurrentPageTasks();
+        });
+
+        // Aktif sayfanın task'larını oluştur
+        async function createCurrentPageTasks() {
+            if (!isJsonMode || currentPageIndex < 0) {
+                showResult('Lütfen önce bir sayfa seçin.', 'warning');
+                return;
+            }
+
+            var tasks = collectTaskData();
+
+            if (tasks.length === 0) {
+                showResult('Bu sayfada oluşturulacak task yok.', 'warning');
+                return;
+            }
+
+            var url = getJiraUrl();
+            var token = $('#jiraToken').val().trim();
+            var projectKey = $('#projectKey').val();
+
+            if (!url || !token) {
+                showResult('Lütfen bağlantı ayarlarını doldurun.', 'danger');
+                return;
+            }
+
+            if (!projectKey) {
+                showResult('Lütfen proje seçin.', 'danger');
+                return;
+            }
+
+            var btn = $('#createPageTasksBtn');
+            btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Oluşturuluyor...');
+
+            var createdKeys = [];
+            var results = [];
+
+            try {
+                for (var i = 0; i < tasks.length; i++) {
+                    try {
+                        var result = await createJiraIssue(tasks[i]);
+                        createdKeys.push(result.key);
+
+                        // Görselleri yükle
+                        var attachmentCount = 0;
+                        if (tasks[i].files && tasks[i].files.length > 0) {
+                            for (var f = 0; f < tasks[i].files.length; f++) {
+                                var uploaded = await uploadAttachment(result.key, tasks[i].files[f]);
+                                if (uploaded) attachmentCount++;
+                            }
+                        }
+
+                        var attachmentInfo = attachmentCount > 0 ? ' (' + attachmentCount + ' görsel eklendi)' : '';
+                        results.push({ success: true, key: result.key, summary: tasks[i].summary, attachmentInfo: attachmentInfo });
+                    } catch (err) {
+                        results.push({ success: false, error: err.message, summary: tasks[i].summary });
+                    }
+                }
+
+                // Task'ları birbirine bağla
+                if (createdKeys.length > 1) {
+                    for (var x = 0; x < createdKeys.length - 1; x++) {
+                        for (var y = x + 1; y < createdKeys.length; y++) {
+                            await linkIssues(createdKeys[x], createdKeys[y]);
+                        }
+                    }
+                }
+
+                // Başarılı taskları history'ye kaydet
+                var successfulTasks = results.filter(function(r) { return r.success; }).map(function(r) {
+                    return { key: r.key, summary: r.summary };
+                });
+
+                if (successfulTasks.length > 0) {
+                    saveToHistory(successfulTasks, getJiraUrl());
+                }
+
+                // Sonuç mesajı oluştur
+                var html = '<strong>' + successfulTasks.length + '/' + results.length + ' task oluşturuldu</strong><br>';
+                for (var r = 0; r < results.length; r++) {
+                    if (results[r].success) {
+                        html += '<a href="' + getJiraUrl() + '/browse/' + results[r].key + '" target="_blank" class="text-decoration-none">' + results[r].key + '</a>' + (results[r].attachmentInfo || '') + ' ';
+                    }
+                }
+
+                if (createdKeys.length > 1) {
+                    html += '<br><small><i class="bi bi-link-45deg"></i> ' + createdKeys.length + ' task bağlandı</small>';
+                }
+
+                var hasError = results.some(function(r) { return !r.success; });
+
+                // Sayfa başarıyla tamamlandıysa işaretle
+                if (!hasError) {
+                    markPageAsCompleted(currentPageIndex);
+
+                    // Sonraki sayfa varsa geçiş öner
+                    if (currentPageIndex < loadedJsonData.pages.length - 1) {
+                        html += '<br><button class="btn btn-sm btn-outline-primary mt-2" onclick="selectPage(' + (currentPageIndex + 1) + ')">Sonraki Sayfaya Geç <i class="bi bi-arrow-right"></i></button>';
+                    } else {
+                        html += '<br><span class="badge bg-success mt-2">Tüm sayfalar tamamlandı!</span>';
+                    }
+                } else {
+                    html += '<br><small class="text-danger">Bazı tasklar oluşturulamadı</small>';
+                }
+
+                showResult(html, hasError ? 'warning' : 'success', 15000);
+
+            } catch (err) {
+                showResult('Hata oluştu: ' + err.message, 'danger');
+            }
+
+            btn.prop('disabled', false).html('<i class="bi bi-cloud-upload"></i> Bu Sayfayı Oluştur');
+        }
+
+        // selectPage'i global yap (toast içindeki buton için)
+        window.selectPage = selectPage;
+
         // ==================== Task Verilerini Topla ====================
 
+        // collectTaskData - Global prefix'ler kullanılıyor
         function collectTaskData() {
-            const tasks = [];
-            const titlePrefix = $('#titlePrefix').val().trim();
-            const descPrefix = $('#descriptionPrefix').val().trim();
+            var tasks = [];
+
+            // Global prefix değerlerini al (yukarıdaki input'lardan)
+            var globalTitlePrefix = $('#titlePrefix').val().trim();
+            var globalDescPrefix = $('#descriptionPrefix').val().trim();
 
             $('#taskTableBody tr').each(function() {
-                const $row = $(this);
-                const rowId = $row.data('id');
-                const titleSuffix = $row.find('.task-title').val().trim();
-                const hours = $row.find('.task-hours').val().trim();
-                const descSuffix = $row.find('.task-desc').val().trim();
-                const fileInput = $row.find('.task-image')[0];
-                const selectedFiles = fileInput ? Array.from(fileInput.files) : [];
-                const pastedFilesList = (window.pastedFiles[rowId] || []).filter(f => f !== null);
+                var $row = $(this);
+                var rowId = $row.data('id');
+
+                // Sadece suffix değerlerini al (prefix artık tabloda yok)
+                var titleSuffix = $row.find('.task-title-suffix').val().trim();
+                var descSuffix = $row.find('.task-desc-suffix').val().trim();
+                var hours = $row.find('.task-hours').val().trim();
+
+                var fileInput = $row.find('.task-image')[0];
+                var selectedFiles = fileInput ? Array.from(fileInput.files) : [];
+                var pastedFilesList = (window.pastedFiles[rowId] || []).filter(function(f) { return f !== null; });
 
                 // Seçilen ve yapıştırılan dosyaları birleştir
-                const allFiles = [...selectedFiles, ...pastedFilesList];
+                var allFiles = selectedFiles.concat(pastedFilesList);
 
-                if (titleSuffix) {
+                // Title: global prefix + suffix birleştir (araya boşluk koy)
+                var fullTitle = globalTitlePrefix && titleSuffix
+                    ? globalTitlePrefix + ' ' + titleSuffix
+                    : (globalTitlePrefix || titleSuffix);
+
+                // Description: global prefix + suffix birleştir (araya boşluk koy)
+                var fullDesc = globalDescPrefix && descSuffix
+                    ? globalDescPrefix + ' ' + descSuffix
+                    : (globalDescPrefix || descSuffix);
+
+                if (fullTitle) {
                     tasks.push({
-                        summary: titlePrefix ? `${titlePrefix} ${titleSuffix}` : titleSuffix,
-                        description: descPrefix ? `${descPrefix} ${descSuffix}` : descSuffix,
+                        summary: fullTitle,
+                        description: fullDesc || '',
                         hours: hours || '3',
                         files: allFiles
                     });
