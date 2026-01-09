@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refinement JSON Önizleme</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding: 20px; }
+        .card { margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .task-card { border-left: 4px solid #0d6efd; }
+        .task-card.html-task { border-left-color: #198754; }
+        .task-card.vbscript-task { border-left-color: #6f42c1; }
+        .page-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .badge-html { background-color: #198754; }
+        .badge-vbscript { background-color: #6f42c1; }
+        .json-input { font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; }
+        .prefix-preview { background-color: #e7f1ff; padding: 2px 6px; border-radius: 3px; font-weight: 500; }
+        .suffix-preview { background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; }
+        .result-title { font-size: 14px; font-weight: 600; color: #212529; }
+        .result-desc { font-size: 13px; color: #495057; }
+        .stats-box { background: #e9ecef; padding: 15px; border-radius: 8px; }
+        .error-box { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 8px; }
+        pre { background: #f1f3f4; padding: 10px; border-radius: 5px; font-size: 12px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sol Panel: JSON Girişi -->
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-code-slash"></i> JSON Girişi
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Refinement JSON'u yapıştır:</label>
+                            <textarea id="jsonInput" class="form-control json-input" rows="25"
+                                placeholder='AI çıktısından JSON kopyala ve buraya yapıştır...'></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary flex-grow-1" id="parseBtn">
+                                <i class="bi bi-play-fill"></i> Önizle
+                            </button>
+                            <button class="btn btn-outline-secondary" id="clearBtn">
+                                <i class="bi bi-x-circle"></i> Temizle
+                            </button>
+                            <button class="btn btn-outline-success" id="copyFormattedBtn" style="display:none;">
+                                <i class="bi bi-clipboard"></i> JSON Kopyala
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Örnek JSON -->
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <i class="bi bi-info-circle"></i> Örnek JSON Formatı
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-sm btn-outline-primary mb-2" id="loadExampleBtn">
+                            <i class="bi bi-box-arrow-in-down"></i> Örnek JSON Yükle
+                        </button>
+                        <pre id="exampleJson" style="max-height: 200px; overflow-y: auto;">{
+  "refinementInfo": {
+    "modulAdi": "Genel Tahakkuk Tahsilat",
+    "titlePrefix": "GTT/",
+    "descPrefix": "GTT Sistemi içerisinde yer alan"
+  },
+  "pages": [
+    {
+      "dosyaAdi": "ornek.asp",
+      "sayfaAdi": "Örnek Sayfa",
+      "tasks": [
+        {
+          "tip": "html",
+          "titleSuffix": "Örnek Sayfa html dönüşümü",
+          "descSuffix": "Örnek sayfanın HTML dönüşümü.",
+          "sure": "2"
+        }
+      ]
+    }
+  ]
+}</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Panel: Önizleme -->
+            <div class="col-md-7">
+                <!-- Hata Mesajı -->
+                <div id="errorBox" class="error-box mb-3" style="display:none;">
+                    <h5><i class="bi bi-exclamation-triangle"></i> JSON Hatası</h5>
+                    <p id="errorMessage" class="mb-0"></p>
+                </div>
+
+                <!-- İstatistikler -->
+                <div id="statsBox" class="stats-box mb-3" style="display:none;">
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <h4 class="mb-0" id="statModul">-</h4>
+                            <small class="text-muted">Modül</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="mb-0 text-primary" id="statPages">0</h4>
+                            <small class="text-muted">Sayfa</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="mb-0 text-success" id="statTasks">0</h4>
+                            <small class="text-muted">Task</small>
+                        </div>
+                        <div class="col-3">
+                            <h4 class="mb-0 text-info" id="statHours">0h</h4>
+                            <small class="text-muted">Toplam Süre</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prefix Bilgileri -->
+                <div id="prefixBox" class="card mb-3" style="display:none;">
+                    <div class="card-header bg-info text-white">
+                        <i class="bi bi-tag"></i> Prefix Ayarları
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Title Prefix:</strong>
+                                <code id="titlePrefixDisplay">-</code>
+                            </div>
+                            <div class="col-6">
+                                <strong>Description Prefix:</strong>
+                                <code id="descPrefixDisplay">-</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Task Listesi -->
+                <div id="taskList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+    $(document).ready(function() {
+        var parsedData = null;
+
+        // Önizle butonu
+        $('#parseBtn').click(function() {
+            var jsonText = $('#jsonInput').val().trim();
+            if (!jsonText) {
+                showError('JSON metni boş. Lütfen AI çıktısından JSON yapıştırın.');
+                return;
+            }
+
+            try {
+                parsedData = JSON.parse(jsonText);
+                validateAndRender(parsedData);
+                $('#copyFormattedBtn').show();
+            } catch (e) {
+                showError('JSON parse hatası: ' + e.message);
+                parsedData = null;
+                $('#copyFormattedBtn').hide();
+            }
+        });
+
+        // Temizle butonu
+        $('#clearBtn').click(function() {
+            $('#jsonInput').val('');
+            $('#errorBox').hide();
+            $('#statsBox').hide();
+            $('#prefixBox').hide();
+            $('#taskList').empty();
+            $('#copyFormattedBtn').hide();
+            parsedData = null;
+        });
+
+        // Örnek JSON yükle
+        $('#loadExampleBtn').click(function() {
+            var example = {
+                "refinementInfo": {
+                    "modulAdi": "Genel Tahakkuk Tahsilat",
+                    "modulPath": "gtt/",
+                    "menuPathPrefix": "Genel Tahakkuk Tahsilat Takip Sistemi",
+                    "olusturmaTarihi": "2025-01-08",
+                    "titlePrefix": "GTT/",
+                    "descPrefix": "Genel Tahakkuk Tahsilat Takip Sistemi içerisinde yer alan"
+                },
+                "pages": [
+                    {
+                        "dosyaAdi": "gtt_mahsup_alindisi.asp",
+                        "klasor": "gtt",
+                        "menuYolu": "Genel Tahakkuk Tahsilat Takip Sistemi/Tahakkuk-Tahsilat İşlemler/Mahsup Alındısı",
+                        "sayfaAdi": "Mahsup Alındısı (Emanet Mahsup)",
+                        "htmlSure": "2",
+                        "vbscriptSure": "3",
+                        "tasks": [
+                            {
+                                "tip": "html",
+                                "titleSuffix": "Mahsup Alındısı (Emanet Mahsup) Sayfası içerisinde yer alan html kodlarının dönüştürülmesi",
+                                "descSuffix": "Tahakkuk-Tahsilat İşlemler / Mahsup Alındısı (gtt/gtt_mahsup_alindisi.asp) Sayfasının HTML kodlarının dönüşümü yapılacaktır.",
+                                "sure": "2"
+                            },
+                            {
+                                "tip": "vbscript",
+                                "titleSuffix": "Mahsup Alındısı (Emanet Mahsup) Sayfası içerisinde yer alan VBScript ve Classic ASP kodlarının dönüştürülmesi + Eventlerin çalıştırılması",
+                                "descSuffix": "Tahakkuk-Tahsilat İşlemler / Mahsup Alındısı (gtt/gtt_mahsup_alindisi.asp) Sayfasının VBScript ve ASP kodlarının JavaScript'e dönüşümü yapılacaktır.",
+                                "sure": "3"
+                            }
+                        ]
+                    }
+                ]
+            };
+            $('#jsonInput').val(JSON.stringify(example, null, 2));
+            $('#parseBtn').click();
+        });
+
+        // Formatlanmış JSON kopyala
+        $('#copyFormattedBtn').click(function() {
+            if (parsedData) {
+                var formatted = JSON.stringify(parsedData, null, 2);
+                navigator.clipboard.writeText(formatted).then(function() {
+                    var btn = $('#copyFormattedBtn');
+                    btn.html('<i class="bi bi-check"></i> Kopyalandı!');
+                    setTimeout(function() {
+                        btn.html('<i class="bi bi-clipboard"></i> JSON Kopyala');
+                    }, 2000);
+                });
+            }
+        });
+
+        function showError(msg) {
+            $('#errorMessage').text(msg);
+            $('#errorBox').show();
+            $('#statsBox').hide();
+            $('#prefixBox').hide();
+            $('#taskList').empty();
+        }
+
+        function validateAndRender(data) {
+            $('#errorBox').hide();
+
+            // Temel doğrulama
+            if (!data.pages || !Array.isArray(data.pages)) {
+                showError('JSON formatı hatalı: "pages" dizisi bulunamadı.');
+                return;
+            }
+
+            var info = data.refinementInfo || {};
+
+            // İstatistikleri hesapla
+            var pageCount = data.pages.length;
+            var taskCount = 0;
+            var totalHours = 0;
+
+            // Benzersiz modülleri topla (sayfa bazlı prefix'lerden)
+            var moduller = {};
+            for (var i = 0; i < data.pages.length; i++) {
+                var page = data.pages[i];
+                var klasor = page.klasor || 'Diğer';
+                moduller[klasor] = (moduller[klasor] || 0) + 1;
+
+                if (page.tasks && page.tasks.length) {
+                    taskCount += page.tasks.length;
+                    for (var j = 0; j < page.tasks.length; j++) {
+                        var sure = parseFloat(page.tasks[j].sure) || 0;
+                        totalHours += sure;
+                    }
+                }
+            }
+
+            // Modül listesini string olarak oluştur
+            var modulListesi = Object.keys(moduller).map(function(k) {
+                return k.toUpperCase() + ' (' + moduller[k] + ')';
+            }).join(', ');
+
+            // İstatistikleri göster
+            $('#statModul').text(modulListesi || 'Belirtilmemiş');
+            $('#statPages').text(pageCount);
+            $('#statTasks').text(taskCount);
+            $('#statHours').text(totalHours + 'h');
+            $('#statsBox').show();
+
+            // Prefix bilgilerini gizle (artık sayfa bazlı)
+            $('#prefixBox').hide();
+
+            // Task listesini oluştur
+            var taskHtml = '';
+            var taskNum = 0;
+
+            for (var i = 0; i < data.pages.length; i++) {
+                var page = data.pages[i];
+
+                // Sayfa bazlı prefix'ler
+                var pageTitlePrefix = page.titlePrefix || '';
+                var pageDescPrefix = page.descPrefix || '';
+
+                // Sayfa başlığı
+                taskHtml += '<div class="card page-header mb-2">';
+                taskHtml += '<div class="card-body py-2">';
+                taskHtml += '<h6 class="mb-0"><i class="bi bi-file-earmark-code"></i> ' +
+                    (page.sayfaAdi || page.dosyaAdi || 'Sayfa ' + (i+1)) + '</h6>';
+                if (page.dosyaAdi) {
+                    taskHtml += '<small class="opacity-75">' + (page.klasor ? page.klasor + '/' : '') + page.dosyaAdi + '</small>';
+                }
+                // Sayfa bazlı prefix'leri göster
+                if (pageTitlePrefix) {
+                    taskHtml += '<div class="mt-1"><small class="text-info"><i class="bi bi-tag"></i> ' + escapeHtml(pageTitlePrefix) + '</small></div>';
+                }
+                taskHtml += '</div></div>';
+
+                // Task'ları göster
+                if (page.tasks && page.tasks.length > 0) {
+                    for (var j = 0; j < page.tasks.length; j++) {
+                        var task = page.tasks[j];
+                        taskNum++;
+
+                        var tipClass = task.tip === 'html' ? 'html-task' : 'vbscript-task';
+                        var tipBadge = task.tip === 'html' ? 'badge-html' : 'badge-vbscript';
+                        var tipLabel = task.tip === 'html' ? 'HTML' : 'VBScript';
+
+                        // Birleştirilmiş başlık ve açıklama (sayfa prefix + task suffix)
+                        var fullTitle = pageTitlePrefix && task.titleSuffix
+                            ? pageTitlePrefix + ' ' + task.titleSuffix
+                            : (pageTitlePrefix || task.titleSuffix || '');
+                        var fullDesc = pageDescPrefix && task.descSuffix
+                            ? pageDescPrefix + ' ' + task.descSuffix
+                            : (pageDescPrefix || task.descSuffix || '');
+
+                        taskHtml += '<div class="card task-card ' + tipClass + ' mb-2">';
+                        taskHtml += '<div class="card-body py-2">';
+
+                        // Üst satır: numara, tip, süre
+                        taskHtml += '<div class="d-flex justify-content-between align-items-center mb-2">';
+                        taskHtml += '<span class="badge ' + tipBadge + '">' + taskNum + '. ' + tipLabel + '</span>';
+                        taskHtml += '<span class="badge bg-secondary">' + (task.sure || '?') + ' saat</span>';
+                        taskHtml += '</div>';
+
+                        // Başlık önizleme
+                        taskHtml += '<div class="mb-2">';
+                        taskHtml += '<strong>Başlık:</strong><br>';
+                        taskHtml += '<span class="result-title">';
+                        if (pageTitlePrefix) {
+                            taskHtml += '<span class="prefix-preview">' + escapeHtml(pageTitlePrefix) + '</span> ';
+                        }
+                        taskHtml += '<span class="suffix-preview">' + escapeHtml(task.titleSuffix || '') + '</span>';
+                        taskHtml += '</span>';
+                        taskHtml += '</div>';
+
+                        // Açıklama önizleme
+                        taskHtml += '<div>';
+                        taskHtml += '<strong>Açıklama:</strong><br>';
+                        taskHtml += '<span class="result-desc">';
+                        if (pageDescPrefix) {
+                            taskHtml += '<span class="prefix-preview">' + escapeHtml(pageDescPrefix) + '</span> ';
+                        }
+                        taskHtml += '<span class="suffix-preview">' + escapeHtml(task.descSuffix || '') + '</span>';
+                        taskHtml += '</span>';
+                        taskHtml += '</div>';
+
+                        taskHtml += '</div></div>';
+                    }
+                } else {
+                    taskHtml += '<div class="alert alert-warning py-2 mb-2">';
+                    taskHtml += '<i class="bi bi-exclamation-triangle"></i> Bu sayfa için task tanımlanmamış.';
+                    taskHtml += '</div>';
+                }
+            }
+
+            $('#taskList').html(taskHtml);
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Yapıştırma ile otomatik önizleme
+        $('#jsonInput').on('paste', function() {
+            setTimeout(function() {
+                if ($('#jsonInput').val().trim()) {
+                    $('#parseBtn').click();
+                }
+            }, 100);
+        });
+    });
+    </script>
+</body>
+</html>
