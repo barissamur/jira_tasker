@@ -2189,13 +2189,23 @@
                     progressBar.addClass('bg-info').removeClass('bg-primary');
                     progressText.html('<i class="bi bi-link-45deg"></i> Task\'lar birbirine bağlanıyor...');
 
+                    var linkedPairs = {}; // Zaten bağlanmış çiftleri takip et
+
                     // Yeni oluşturulan her task'ı diğer tüm task'larla bağla
                     for (var n = 0; n < createdKeys.length; n++) {
                         for (var a = 0; a < allKeys.length; a++) {
+                            var key1 = createdKeys[n];
+                            var key2 = allKeys[a];
+
                             // Kendisiyle bağlama
-                            if (createdKeys[n] !== allKeys[a]) {
-                                await linkIssues(createdKeys[n], allKeys[a]);
-                            }
+                            if (key1 === key2) continue;
+
+                            // Çift zaten bağlandıysa atla (A-B ve B-A aynı)
+                            var pairKey = [key1, key2].sort().join('-');
+                            if (linkedPairs[pairKey]) continue;
+
+                            await linkIssues(key1, key2);
+                            linkedPairs[pairKey] = true;
                         }
                     }
                 }
